@@ -1,83 +1,344 @@
-function changeCount(ean, amount) {
-if (historyObjects[ean]) {
-historyObjects[ean] += amount;
-if (historyObjects[ean] <= 0) {
-deleteItem(ean);
-return;
-}
-saveToStorage();
-renderHistory();
-}
-}
-function deleteItem(ean) {
-delete historyObjects[ean];
-saveToStorage();
-renderHistory();
-}
-function clearAllHistory() {
-if (confirm("Vil du slette hele listen?")) {
-historyObjects = {};
-saveToStorage();
-renderHistory();
-document.getElementById("resultCard").style.display = "none";
-}
-}
-function shareList(type) {
-const keys = Object.keys(historyObjects);
-if (keys.length === 0) {
-alert("Listen er tom!");
-return;
-}
-let textContent = "Bygma Materialeliste:\n";
-keys.forEach(ean => {
-textContent += - ${historyObjects[ean]} stk. (EAN: ${ean}) -> https://bygma.dk{ean}\n;
-});
-if (type === 'sms') {
-window.location.href = sms:?&body=${encodeURIComponent(textContent)};
-} else if (type === 'email') {
-window.location.href = mailto:?subject=Bygma%20Materialeliste&body=${encodeURIComponent(textContent)};
-}
-}
-function renderHistory() {
-const container = document.getElementById("historyContainer");
-container.innerHTML = "";
-const keys = Object.keys(historyObjects).reverse();
-if (keys.length === 0) {
-container.innerHTML = <p style="text-align:center; color:var(--text-muted); font-size:0.9rem; margin-top:10px;">Listen er tom</p>;
-return;
-}
-keys.forEach((ean) => {
-const url = https://bygma.dk{ean};
-const count = historyObjects[ean];
-const item = document.createElement("div");
-item.className = "history-item";
-item.innerHTML = <div class="history-info"> <span style="font-weight:700;">Vare</span> <span class="history-ean">${ean}</span> </div> <div class="history-actions"> <div class="counter-group"> <button class="btn-counter" onclick="changeCount('${ean}', -1)">-</button> <span class="counter-val">${count}</span> <button class="btn-counter" onclick="changeCount('${ean}', 1)">+</button> </div> <a href="${url}" target="_blank" class="history-link">Åbn</a> <button class="btn-delete-item" onclick="deleteItem('${ean}')">✕</button> </div>;
-container.appendChild(item);
-});
-}
-function startScanner() {
-html5QrcodeScanner = new Html5Qrcode("reader");
-html5QrcodeScanner.start(
-{ facingMode: "environment" },
-{
-fps: 25,
-qrbox: function(width, height) {
-return { width: Math.floor(width * 0.85), height: Math.floor(height * 0.45) }
-}
-},
-onScanSuccess
-).catch(err => {
-document.getElementById("status").innerText = "Kamerafejl. Tjek tilladelser.";
-});
-}
-function restartScanner() {
-if (html5QrcodeScanner) {
-html5QrcodeScanner.stop().then(() => startScanner()).catch(() => startScanner());
-} else {
-startScanner();
-}
-}
-window.addEventListener("DOMContentLoaded", () => {
-startScanner();
-renderHistory();
-});
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Bygma Scanner Pro</title>
+    
+    <!-- iOS PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Bygma Pro">
+    
+    <!-- Scanner Bibliotek -->
+    <script src="https://unpkg.com"></script>
+    
+    <style>
+        :root {
+            --bygma-red: #d8232a;
+            --bygma-dark: #1c1c1e;
+            --ios-bg: #121214;
+            --card-bg: #1a1a1e;
+            --text-main: #ffffff;
+            --text-muted: #a1a1aa;
+            --success-green: #30d158;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--ios-bg);
+            color: var(--text-main);
+            -webkit-user-select: none;
+            user-select: none;
+            padding-bottom: 40px;
+        }
+
+        .header {
+            background-color: var(--bygma-dark);
+            color: white;
+            text-align: center;
+            padding: 40px 15px 20px 15px;
+            font-weight: 800;
+            font-size: 1.3rem;
+            letter-spacing: 1px;
+            border-bottom: 1px solid #2c2c2e;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .container {
+            padding: 16px;
+            max-width: 500px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        #reader-container {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: #000;
+            border: 2px solid #2c2c2e;
+        }
+
+        #reader-container.flash {
+            border-color: var(--success-green);
+        }
+
+        #reader {
+            width: 100% !important;
+            border: none !important;
+        }
+
+        .status-message {
+            text-align: center;
+            color: var(--text-muted);
+            margin: 15px 0;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: 1px solid #2c2c2e;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 25px;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0;
+        }
+
+        .btn-clear {
+            background: none;
+            border: none;
+            color: var(--bygma-red);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+
+        .product-title {
+            font-size: 1.2rem;
+            font-weight: 800;
+            margin: 0 0 6px 0;
+        }
+
+        .product-meta {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin: 0 0 16px 0;
+            font-family: monospace;
+        }
+
+        .btn {
+            display: block;
+            background-color: var(--bygma-red);
+            color: white;
+            text-decoration: none;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1rem;
+            border: none;
+            width: 100%;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+
+        .btn:active {
+            opacity: 0.8;
+        }
+
+        .btn-action-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+
+        .btn-share {
+            background-color: #2c2c2e;
+            border: 1px solid #3a3a3c;
+            font-size: 0.9rem;
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .btn-share.sms { color: #30d158; }
+        .btn-share.mail { color: #0a84ff; }
+
+        .btn-secondary {
+            background-color: #2c2c2e;
+            color: var(--text-main);
+            margin-top: 15px;
+            font-size: 0.85rem;
+            padding: 12px;
+            border: 1px solid #3a3a3c;
+            width: 100%;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .history-item {
+            background: var(--card-bg);
+            border-radius: 14px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #2c2c2e;
+        }
+
+        .history-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .history-ean {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .history-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .counter-group {
+            display: flex;
+            align-items: center;
+            background: #2c2c2e;
+            border-radius: 10px;
+            padding: 3px;
+        }
+
+        .btn-counter {
+            background: #3a3a3c;
+            border: none;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 700;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .counter-val {
+            font-weight: 700;
+            font-size: 1rem;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .history-link {
+            color: var(--bygma-red);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.85rem;
+            padding: 8px 14px;
+            border: 1.5px solid var(--bygma-red);
+            border-radius: 8px;
+        }
+
+        .btn-delete-item {
+            background: none;
+            border: none;
+            color: #ff453a;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">BYGMA SCANNER PRO</div>
+
+    <div class="container">
+        <!-- Kamera-visning -->
+        <div id="reader-container">
+            <div id="reader"></div>
+        </div>
+        <div id="status" class="status-message">Søg efter en stregkode...</div>
+
+        <!-- Seneste scanning -->
+        <div id="resultCard" class="card" style="display: none;">
+            <p style="color: var(--bygma-red); font-weight: 800; font-size: 0.75rem; text-transform: uppercase; margin: 0 0 6px 0;">Seneste scanning</p>
+            <h3 id="prodTitle" class="product-title">Vare registreret</h3>
+            <p id="prodMeta" class="product-meta">EAN: -</p>
+            <a id="prodLink" href="#" target="_blank" class="btn">Vis på Bygma.dk</a>
+        </div>
+
+        <!-- Delingsknapper -->
+        <div class="btn-action-group">
+            <button class="btn-share sms" onclick="shareList('sms')">💬 Send SMS</button>
+            <button class="btn-share mail" onclick="shareList('email')">✉️ Send Mail</button>
+        </div>
+
+        <!-- Materialeliste -->
+        <div class="section-header">
+            <h4 class="section-title">Min materialeliste</h4>
+            <button class="btn-clear" onclick="clearAllHistory()">Ryd alle</button>
+        </div>
+        
+        <div id="historyContainer" class="history-list"></div>
+
+        <button class="btn-secondary" onclick="restartScanner()">🔄 Nulstil/Tænd Kamera</button>
+    </div>
+
+    <script>
+        let isScanningBlock = false;
+        let html5QrcodeScanner = null;
+        let historyObjects = JSON.parse(localStorage.getItem('bygma_items')) || {};
+
+        function onScanSuccess(decodedText) {
+            if (isScanningBlock) return;
+            isScanningBlock = true;
+            
+            const container = document.getElementById("reader-container");
+            container.classList.add("flash");
+            setTimeout(() => container.classList.remove("flash"), 300);
+
+            if (navigator.vibrate) navigator.vibrate(80);
+
+            document.getElementById("status").innerText = "Registreret!";
+            
+            const bygmaSearchUrl = `https://bygma.dk{decodedText}`;
+            
+            document.getElementById("resultCard").style.display = "block";
+            document.getElementById("prodMeta").innerText = "EAN: " + decodedText;
+            document.getElementById("prodLink").href = bygmaSearchUrl;
+            
+            if (historyObjects[decodedText]) {
+                historyObjects[decodedText] += 1;
+            } else {
+                historyObjects[decodedText] = 1;
+            }
+
+            saveToStorage();
+            renderHistory();
+
+            setTimeout(() => {
+                isScanningBlock = false;
+                document.getElementById("status").innerText = "Klar til næste...";
