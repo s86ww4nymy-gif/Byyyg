@@ -1,0 +1,83 @@
+function changeCount(ean, amount) {
+if (historyObjects[ean]) {
+historyObjects[ean] += amount;
+if (historyObjects[ean] <= 0) {
+deleteItem(ean);
+return;
+}
+saveToStorage();
+renderHistory();
+}
+}
+function deleteItem(ean) {
+delete historyObjects[ean];
+saveToStorage();
+renderHistory();
+}
+function clearAllHistory() {
+if (confirm("Vil du slette hele listen?")) {
+historyObjects = {};
+saveToStorage();
+renderHistory();
+document.getElementById("resultCard").style.display = "none";
+}
+}
+function shareList(type) {
+const keys = Object.keys(historyObjects);
+if (keys.length === 0) {
+alert("Listen er tom!");
+return;
+}
+let textContent = "Bygma Materialeliste:\n";
+keys.forEach(ean => {
+textContent += - ${historyObjects[ean]} stk. (EAN: ${ean}) -> https://bygma.dk{ean}\n;
+});
+if (type === 'sms') {
+window.location.href = sms:?&body=${encodeURIComponent(textContent)};
+} else if (type === 'email') {
+window.location.href = mailto:?subject=Bygma%20Materialeliste&body=${encodeURIComponent(textContent)};
+}
+}
+function renderHistory() {
+const container = document.getElementById("historyContainer");
+container.innerHTML = "";
+const keys = Object.keys(historyObjects).reverse();
+if (keys.length === 0) {
+container.innerHTML = <p style="text-align:center; color:var(--text-muted); font-size:0.9rem; margin-top:10px;">Listen er tom</p>;
+return;
+}
+keys.forEach((ean) => {
+const url = https://bygma.dk{ean};
+const count = historyObjects[ean];
+const item = document.createElement("div");
+item.className = "history-item";
+item.innerHTML = <div class="history-info"> <span style="font-weight:700;">Vare</span> <span class="history-ean">${ean}</span> </div> <div class="history-actions"> <div class="counter-group"> <button class="btn-counter" onclick="changeCount('${ean}', -1)">-</button> <span class="counter-val">${count}</span> <button class="btn-counter" onclick="changeCount('${ean}', 1)">+</button> </div> <a href="${url}" target="_blank" class="history-link">Åbn</a> <button class="btn-delete-item" onclick="deleteItem('${ean}')">✕</button> </div>;
+container.appendChild(item);
+});
+}
+function startScanner() {
+html5QrcodeScanner = new Html5Qrcode("reader");
+html5QrcodeScanner.start(
+{ facingMode: "environment" },
+{
+fps: 25,
+qrbox: function(width, height) {
+return { width: Math.floor(width * 0.85), height: Math.floor(height * 0.45) }
+}
+},
+onScanSuccess
+).catch(err => {
+document.getElementById("status").innerText = "Kamerafejl. Tjek tilladelser.";
+});
+}
+function restartScanner() {
+if (html5QrcodeScanner) {
+html5QrcodeScanner.stop().then(() => startScanner()).catch(() => startScanner());
+} else {
+startScanner();
+}
+}
+window.addEventListener("DOMContentLoaded", () => {
+startScanner();
+renderHistory();
+});
